@@ -1135,3 +1135,20 @@ html:has(.screen) body {
     transition-duration: 0.01ms !important;
   }
 }
+
+.block__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.block__head .block__title {
+  margin-bottom: 0;
+}
+
+.shop__main > .icon-btn {
+  margin-left: -6px;
+  margin-right: -8px;
+}

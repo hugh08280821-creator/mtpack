@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ConfirmButton } from './ConfirmButton'
-import { addShop, entries, memberKey, pick, removeShop, updateShop, type ShopItem, type Trip } from './data'
-import { CheckIcon, MinusIcon, PlusIcon } from './icons'
+import { addShop, entries, memberKey, pick, removeShop, removeShops, updateShop, type ShopItem, type Trip } from './data'
+import { CheckIcon, CloseIcon, MinusIcon, PlusIcon } from './icons'
 import { fmtAmount, isMeasure, stepFor, suggestsGrams, UNIT_PRESETS } from './units'
 
 type Row = ShopItem & { id: string }
@@ -60,9 +60,18 @@ export function ShopTab({ tripId, trip, me }: { tripId: string; trip: Trip; me: 
 
           {done.length > 0 && (
             <section className="block">
-              <h2 className="block__title">
-                담은 것 <span className="count">{done.length}</span>
-              </h2>
+              <div className="block__head">
+                <h2 className="block__title">
+                  담은 것 <span className="count">{done.length}</span>
+                </h2>
+                <ConfirmButton
+                  className="btn btn--sm btn--danger"
+                  confirmLabel={`${done.length}개 지우기`}
+                  onConfirm={() => void removeShops(tripId, done.map((s) => s.id))}
+                >
+                  모두 지우기
+                </ConfirmButton>
+              </div>
               <ul className="rows">
                 {done.map((s) => (
                   <ShopRow key={s.id} tripId={tripId} item={s} me={me} />
@@ -212,7 +221,20 @@ function AddShop({ onAdd }: { onAdd: (item: { name: string; qty: number; unit: s
       onSubmit={(e) => {
         e.preventDefault()
         if (!valid) return
-        onAdd({ name: name.trim(), qty, unit: unit.trim() || '개' })
+        // "쌈장, 김치, 쌈채소"처럼 쉼표로 쓰면 하나씩 따로 추가
+        const names = name
+          .split(/[,，\n]/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+        if (names.length === 1) {
+          onAdd({ name: names[0], qty, unit: unit.trim() || '개' })
+        } else {
+          names.forEach((n) => {
+            if (unitTouched) onAdd({ name: n, qty, unit: unit.trim() || '개' })
+            else if (suggestsGrams(n)) onAdd({ name: n, qty: 600, unit: 'g' })
+            else onAdd({ name: n, qty: 1, unit: '개' })
+          })
+        }
         setName('')
         setQty(1)
         setUnit('개')
@@ -220,7 +242,7 @@ function AddShop({ onAdd }: { onAdd: (item: { name: string; qty: number; unit: s
         setFormKey((k) => k + 1)
       }}
     >
-      <input className="field" placeholder="예: 삼겹살, 콜라, 쌈장" value={name} onChange={(e) => onName(e.target.value)} maxLength={60} />
+      <input className="field" placeholder="삼겹살, 콜라처럼 쉼표로 여러 개" value={name} onChange={(e) => onName(e.target.value)} maxLength={60} />
       <AmountField
         key={formKey}
         qty={qty}
@@ -293,6 +315,9 @@ function ShopRow({ tripId, item, me }: { tripId: string; item: Row; me: string }
               </div>
             )
           ))}
+        <ConfirmButton className="icon-btn" confirmLabel="삭제" onConfirm={() => void removeShop(tripId, item.id)}>
+          <CloseIcon size={18} aria-label={`${item.name} 삭제`} />
+        </ConfirmButton>
       </div>
       {panel === 'pick' && !full && (
         <PickPanel item={item} me={me} onPick={(n) => void pick(tripId, item.id, me, n)} onDone={() => setPanel('none')} />

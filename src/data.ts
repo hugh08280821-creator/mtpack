@@ -142,6 +142,11 @@ export function removeShop(tripId: string, id: string) {
   return remove(tripRef(tripId, `shop/${id}`))
 }
 
+/** 여러 개를 한 번에 지운다 (담은 것 모두 지우기) */
+export function removeShops(tripId: string, ids: string[]) {
+  return update(tripRef(tripId, 'shop'), Object.fromEntries(ids.map((id) => [id, null])))
+}
+
 /**
  * 담은 개수를 바꾼다. 여러 명이 동시에 눌러도 숫자가 꼬이지 않게 트랜잭션으로 처리.
  * delta > 0 이면 내가 담은 것, < 0 이면 빼기(내가 담은 것부터, 모자라면 다른 사람 것에서).

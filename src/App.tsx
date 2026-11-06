@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
-import { createTrip, joinTrip, renameTrip, useConnected, useTrip } from './data'
+import { useEffect, useState, type ReactNode } from 'react'
+import { createTrip, joinTrip, renameTrip, useConnected, useTrip, type Trip } from './data'
 import { db } from './firebase'
+import { AutoThemeIcon, MoonIcon, ShareIcon, SunIcon } from './icons'
 import { PrepTab } from './PrepTab'
 import { ShopTab } from './ShopTab'
+import { useTheme } from './theme'
 
 /** 주소 끝 #abc12345 가 여행 코드 */
 function useHashTripId() {
@@ -35,23 +37,52 @@ function saveName(tripId: string, name: string) {
 
 export function App() {
   const tripId = useHashTripId()
-  if (!db) return <SetupNeeded />
-  if (!tripId) return <Home />
-  return <TripGate key={tripId} tripId={tripId} />
+  const theme = useTheme()
+  if (!db) return <Screen title="설정이 필요해요" desc="src/firebaseConfig.ts 에 Firebase 웹 설정값을 넣어 주세요." />
+  if (!tripId) return <Home theme={theme} />
+  return <TripGate key={tripId} tripId={tripId} theme={theme} />
 }
 
-function SetupNeeded() {
+type ThemeCtl = ReturnType<typeof useTheme>
+
+function ThemeButton({ theme }: { theme: ThemeCtl }) {
+  const label = { system: '시스템 설정 따라가기', light: '라이트 모드', dark: '다크 모드' }[theme.mode]
+  const Icon = { system: AutoThemeIcon, light: SunIcon, dark: MoonIcon }[theme.mode]
   return (
-    <main className="center">
-      <div className="card narrow">
-        <h1 className="title">설정이 필요해요</h1>
-        <p className="muted">src/firebaseConfig.ts 에 Firebase 웹 설정값을 넣어 주세요.</p>
-      </div>
-    </main>
+    <button className="icon-btn icon-btn--plain" onClick={theme.cycle} aria-label={`화면 테마: ${label}`} title={label}>
+      <Icon size={22} />
+    </button>
   )
 }
 
-function Home() {
+/** 이름 입력·여행 만들기 같은 한 화면짜리 단계 */
+function Screen({
+  title,
+  desc,
+  children,
+  cta,
+  theme,
+}: {
+  title: ReactNode
+  desc?: ReactNode
+  children?: ReactNode
+  cta?: ReactNode
+  theme?: ThemeCtl
+}) {
+  return (
+    <div className="screen">
+      <div className="screen__bar">{theme && <ThemeButton theme={theme} />}</div>
+      <div className="screen__body">
+        <h1 className="screen__title">{title}</h1>
+        {desc && <p className="screen__desc">{desc}</p>}
+        {children}
+      </div>
+      {cta && <div className="screen__cta">{cta}</div>}
+    </div>
+  )
+}
+
+function Home({ theme }: { theme: ThemeCtl }) {
   const [name, setName] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -60,80 +91,78 @@ function Home() {
     setBusy(true)
     setError('')
     try {
-      const id = await createTrip(name.trim())
-      location.hash = id
+      location.hash = await createTrip(name.trim())
     } catch (e) {
-      setError('만들지 못했어요. 인터넷 연결을 확인해 주세요.')
+      setError('만들지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.')
       console.error(e)
       setBusy(false)
     }
   }
   return (
-    <main className="center">
-      <div className="card narrow">
-        <div className="logo" aria-hidden>
-          <img src="./favicon.svg" alt="" width={48} height={48} />
-        </div>
-        <h1 className="title">MT 준비물</h1>
-        <p className="muted">
-          각자 챙길 준비물과 장보기 목록을 같이 보는 페이지예요.
-          <br />
-          여행을 만들고 나온 링크를 단톡방에 공유하세요.
-        </p>
-        <form
-          className="stack"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void submit()
-          }}
-        >
-          <input
-            className="input"
-            placeholder="예: 11월 가평 MT"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={40}
-            autoFocus
-          />
-          <button className="btn btn--primary" disabled={!name.trim() || busy}>
-            {busy ? '만드는 중…' : '여행 만들기'}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        void submit()
+      }}
+    >
+      <Screen
+        theme={theme}
+        title={
+          <>
+            어떤 MT를
+            <br />
+            준비하고 있나요?
+          </>
+        }
+        desc="준비물과 장보기 목록을 친구들과 같이 채우는 페이지예요. 만들고 나온 링크를 단톡방에 공유하세요."
+        cta={
+          <button className="btn btn--primary btn--xl" disabled={!name.trim() || busy}>
+            {busy ? '만드는 중…' : '만들기'}
           </button>
-          {error && <p className="error">{error}</p>}
-        </form>
-      </div>
-    </main>
+        }
+      >
+        <label className="big-field">
+          <span>MT 이름</span>
+          <input placeholder="예: 11월 가평 MT" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} autoFocus />
+        </label>
+        {error && <p className="error">{error}</p>}
+      </Screen>
+    </form>
   )
 }
 
-function TripGate({ tripId }: { tripId: string }) {
+function TripGate({ tripId, theme }: { tripId: string; theme: ThemeCtl }) {
   const trip = useTrip(tripId)
   const [me, setMe] = useState(() => loadName(tripId))
   const [editingName, setEditingName] = useState(false)
 
   if (trip === undefined) {
     return (
-      <main className="center">
-        <p className="muted">불러오는 중…</p>
-      </main>
+      <div className="loading" aria-live="polite">
+        <span className="spinner" />
+        불러오는 중
+      </div>
     )
   }
   if (trip === null) {
     return (
-      <main className="center">
-        <div className="card narrow">
-          <h1 className="title">여행을 찾을 수 없어요</h1>
-          <p className="muted">링크가 맞는지 확인해 주세요.</p>
-          <a className="btn btn--ghost" href="#">
-            새 여행 만들기
+      <Screen
+        theme={theme}
+        title="MT를 찾을 수 없어요"
+        desc="링크가 잘렸거나 잘못 복사됐을 수 있어요. 받은 링크를 다시 확인해 주세요."
+        cta={
+          <a className="btn btn--soft btn--xl" href="#">
+            새로 만들기
           </a>
-        </div>
-      </main>
+        }
+      />
     )
   }
 
   if (!me || editingName) {
     return (
       <NamePicker
+        theme={theme}
         tripName={trip.meta.name}
         members={Object.values(trip.members ?? {}).map((m) => m.name)}
         current={me}
@@ -148,7 +177,7 @@ function TripGate({ tripId }: { tripId: string }) {
     )
   }
 
-  return <TripView tripId={tripId} trip={trip} me={me} onChangeName={() => setEditingName(true)} />
+  return <TripView tripId={tripId} trip={trip} me={me} theme={theme} onChangeName={() => setEditingName(true)} />
 }
 
 function NamePicker({
@@ -157,12 +186,14 @@ function NamePicker({
   current,
   onPick,
   onCancel,
+  theme,
 }: {
   tripName: string
   members: string[]
   current: string
   onPick: (name: string) => void
   onCancel?: () => void
+  theme: ThemeCtl
 }) {
   const [name, setName] = useState(() => {
     if (current) return current
@@ -174,46 +205,53 @@ function NamePicker({
   })
   const sorted = [...members].sort((a, b) => a.localeCompare(b, 'ko'))
   return (
-    <main className="center">
-      <div className="card narrow">
-        <p className="eyebrow">{tripName}</p>
-        <h1 className="title">이름이 뭐예요?</h1>
-        <p className="muted">내가 올린 준비물과 장바구니에 이 이름이 표시돼요.</p>
-        {sorted.length > 0 && (
-          <div className="chips">
-            {sorted.map((m) => (
-              <button key={m} className={`chip ${m === current ? 'is-on' : ''}`} onClick={() => onPick(m)}>
-                {m}
+    <form
+      onSubmit={(e) => {
+        e.preventDefault()
+        if (name.trim()) onPick(name.trim())
+      }}
+    >
+      <Screen
+        theme={theme}
+        title={
+          <>
+            {tripName}
+            <br />
+            <span className="screen__title-sub">이름을 알려주세요</span>
+          </>
+        }
+        desc="내가 올린 준비물과 장바구니에 이 이름이 보여요."
+        cta={
+          <>
+            {onCancel && (
+              <button type="button" className="btn btn--soft btn--xl" onClick={onCancel}>
+                취소
               </button>
-            ))}
+            )}
+            <button className="btn btn--primary btn--xl" disabled={!name.trim()}>
+              들어가기
+            </button>
+          </>
+        }
+      >
+        {sorted.length > 0 && (
+          <div className="pick-names">
+            <p className="caption">먼저 들어온 사람</p>
+            <div className="chips">
+              {sorted.map((m) => (
+                <button type="button" key={m} className={`chip ${m === current ? 'is-on' : ''}`} onClick={() => onPick(m)}>
+                  {m}
+                </button>
+              ))}
+            </div>
           </div>
         )}
-        <form
-          className="stack"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (name.trim()) onPick(name.trim())
-          }}
-        >
-          <input
-            className="input"
-            placeholder={sorted.length ? '목록에 없으면 이름 입력' : '이름 입력'}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            maxLength={20}
-            autoFocus={sorted.length === 0}
-          />
-          <button className="btn btn--primary" disabled={!name.trim()}>
-            들어가기
-          </button>
-          {onCancel && (
-            <button type="button" className="btn btn--ghost" onClick={onCancel}>
-              취소
-            </button>
-          )}
-        </form>
-      </div>
-    </main>
+        <label className="big-field">
+          <span>{sorted.length ? '목록에 없으면 직접 입력' : '이름'}</span>
+          <input placeholder="예: 김민수" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} autoFocus={sorted.length === 0} />
+        </label>
+      </Screen>
+    </form>
   )
 }
 
@@ -223,11 +261,13 @@ function TripView({
   tripId,
   trip,
   me,
+  theme,
   onChangeName,
 }: {
   tripId: string
-  trip: NonNullable<ReturnType<typeof useTrip>>
+  trip: Trip
   me: string
+  theme: ThemeCtl
   onChangeName: () => void
 }) {
   const [tab, setTab] = useState<Tab>(() => {
@@ -238,7 +278,7 @@ function TripView({
     }
   })
   const connected = useConnected()
-  const [copied, setCopied] = useState(false)
+  const [toast, setToast] = useState('')
 
   const choose = (t: Tab) => {
     setTab(t)
@@ -262,12 +302,11 @@ function TripView({
     }
     try {
       await navigator.clipboard.writeText(url)
+      setToast('링크를 복사했어요. 단톡방에 붙여 넣으세요.')
+      window.setTimeout(() => setToast(''), 2200)
     } catch {
       window.prompt('이 링크를 복사하세요', url)
-      return
     }
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 1800)
   }
 
   const shop = Object.values(trip.shop ?? {})
@@ -278,30 +317,36 @@ function TripView({
       <header className="top">
         <div className="top__row">
           <TripTitle tripId={tripId} name={trip.meta.name} />
-          <button className="btn btn--small" onClick={() => void share()}>
-            {copied ? '복사됨' : '링크 공유'}
+          <ThemeButton theme={theme} />
+          <button className="icon-btn icon-btn--plain" onClick={() => void share()} aria-label="링크 공유" title="링크 공유">
+            <ShareIcon size={22} />
           </button>
         </div>
-        <div className="top__row top__sub">
+        <div className="top__sub">
           <button className="me" onClick={onChangeName} title="이름 바꾸기">
-            <span className="avatar">{me.slice(0, 1)}</span>
+            <span className="avatar avatar--sm">{me.slice(0, 1)}</span>
             {me}
           </button>
           {!connected && <span className="offline">오프라인 · 연결되면 저장돼요</span>}
         </div>
         <nav className="tabs" role="tablist">
-          <button role="tab" aria-selected={tab === 'prep'} className="tab" onClick={() => choose('prep')}>
+          <button role="tab" aria-selected={tab === 'prep'} className="tabs__tab" onClick={() => choose('prep')}>
             준비물
           </button>
-          <button role="tab" aria-selected={tab === 'shop'} className="tab" onClick={() => choose('shop')}>
+          <button role="tab" aria-selected={tab === 'shop'} className="tabs__tab" onClick={() => choose('shop')}>
             장보기
-            {shop.length > 0 && <span className="badge">{shopLeft === 0 ? '완료' : `${shopLeft}`}</span>}
+            {shop.length > 0 && shopLeft > 0 && <span className="tabs__badge num">{shopLeft}</span>}
           </button>
         </nav>
       </header>
       <main className="content">
         {tab === 'prep' ? <PrepTab tripId={tripId} trip={trip} me={me} /> : <ShopTab tripId={tripId} trip={trip} me={me} />}
       </main>
+      {toast && (
+        <div className="toast" role="status">
+          {toast}
+        </div>
+      )}
     </div>
   )
 }
@@ -311,8 +356,10 @@ function TripTitle({ tripId, name }: { tripId: string; name: string }) {
   const [value, setValue] = useState(name)
   if (!editing) {
     return (
-      <h1 className="trip-name" onClick={() => (setValue(name), setEditing(true))} title="눌러서 이름 바꾸기">
-        {name}
+      <h1 className="trip-name">
+        <button onClick={() => (setValue(name), setEditing(true))} title="눌러서 이름 바꾸기">
+          {name}
+        </button>
       </h1>
     )
   }
@@ -322,7 +369,7 @@ function TripTitle({ tripId, name }: { tripId: string; name: string }) {
   }
   return (
     <input
-      className="input trip-name-input"
+      className="field trip-name-input"
       value={value}
       autoFocus
       maxLength={40}
@@ -332,6 +379,7 @@ function TripTitle({ tripId, name }: { tripId: string; name: string }) {
         if (e.key === 'Enter') done()
         if (e.key === 'Escape') setEditing(false)
       }}
+      aria-label="MT 이름"
     />
   )
 }

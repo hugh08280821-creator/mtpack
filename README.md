@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-`master`에 push하면 GitHub Actions가 GitHub Pages로 배포한다.
+`npm run deploy` 하면 빌드해서 gh-pages 브랜치로 올리고, GitHub Pages가 그 브랜치를 보여준다.
 
 ## Firebase 규칙
 

@@ -1152,3 +1152,18 @@ html:has(.screen) body {
   margin-left: -6px;
   margin-right: -8px;
 }
+
+.amount__unit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.amount__conv {
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--blue-soft);
+  color: var(--blue-soft-text);
+  font-size: 15px;
+  font-weight: 700;
+}

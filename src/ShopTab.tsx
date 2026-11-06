@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { ConfirmButton } from './ConfirmButton'
 import { addShop, entries, memberKey, pick, removeShop, removeShops, updateShop, type ShopItem, type Trip } from './data'
 import { CheckIcon, CloseIcon, MinusIcon, PlusIcon } from './icons'
-import { fmtAmount, isMeasure, stepFor, suggestsGrams, UNIT_PRESETS } from './units'
+import { fmtAmount, isMeasure, isScaled, stepFor, suggestsGrams, UNIT_PRESETS } from './units'
 
 type Row = ShopItem & { id: string }
 
@@ -150,7 +150,10 @@ function AmountField({
             autoFocus
           />
         ) : (
-          <span className="amount__unit">{unit || '개'}</span>
+          <span className="amount__unit">
+            {unit || '개'}
+            {isScaled(qty, unit) && <span className="amount__conv num">= {fmtAmount(qty, unit)}</span>}
+          </span>
         )}
       </div>
     </div>
@@ -286,12 +289,14 @@ function ShopRow({ tripId, item, me }: { tripId: string; item: Row; me: string }
           <span className="shop__name">{item.name}</span>
           <span className="shop__meta">
             <span className="shop__qty num">
-              {got > 0 && !full ? `${got.toLocaleString('ko-KR')} / ${fmtAmount(item.qty, item.unit)}` : fmtAmount(item.qty, item.unit)}
+              {got > 0 && !full
+                ? `${measure ? fmtAmount(got, item.unit) : got.toLocaleString('ko-KR')} / ${fmtAmount(item.qty, item.unit)}`
+                : fmtAmount(item.qty, item.unit)}
             </span>
             {pickers.length > 0 && (
               <span className="shop__by">
                 {pickers
-                  .map(([who, n]) => (item.qty > 1 && pickers.length > 1 ? `${who} ${n.toLocaleString('ko-KR')}` : who))
+                  .map(([who, n]) => (item.qty > 1 && pickers.length > 1 ? `${who} ${measure ? fmtAmount(n, item.unit) : n.toLocaleString('ko-KR')}` : who))
                   .join(' · ')}{' '}
                 담음
               </span>

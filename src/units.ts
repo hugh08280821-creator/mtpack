@@ -12,7 +12,17 @@ const MEAT = /고기|삼겹|목살|항정|갈비|등심|안심|차돌|우삼겹|
 /** 이름만 보고 g이 어울리는 물건인지 (고기류) */
 export const suggestsGrams = (name: string) => MEAT.test(name)
 
+/** 1,000 이상이면 한 단계 큰 단위로 (g → kg, ml → L) */
+const BIGGER: Record<string, string> = { g: 'kg', ml: 'L' }
+
 export function fmtAmount(n: number, unit: string) {
   const u = unit.trim() || '개'
+  const big = BIGGER[u]
+  if (big && n >= 1000) {
+    return `${(n / 1000).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}${big}`
+  }
   return `${n.toLocaleString('ko-KR')}${u}`
 }
+
+/** 큰 단위로 바뀌는 양인지 (입력할 때 옆에 환산값을 보여줄지) */
+export const isScaled = (n: number, unit: string) => !!BIGGER[unit.trim()] && n >= 1000

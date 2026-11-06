@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { createTrip, joinTrip, renameTrip, useConnected, useTrip, type Trip } from './data'
+import { createTrip, joinTrip, memberKey, renameTrip, useConnected, useTrip, type Trip } from './data'
 import { db } from './firebase'
 import { AutoThemeIcon, MoonIcon, ShareIcon, SunIcon } from './icons'
 import { PrepTab } from './PrepTab'
@@ -135,6 +135,8 @@ function TripGate({ tripId, theme }: { tripId: string; theme: ThemeCtl }) {
   const trip = useTrip(tripId)
   const [me, setMe] = useState(() => loadName(tripId))
   const [editingName, setEditingName] = useState(false)
+  // 이번 접속에서 이름을 고른 직후엔 명단 반영 전이라도 튕기지 않게
+  const [picked, setPicked] = useState(false)
 
   if (trip === undefined) {
     return (
@@ -159,17 +161,21 @@ function TripGate({ tripId, theme }: { tripId: string; theme: ThemeCtl }) {
     )
   }
 
-  if (!me || editingName) {
+  // 저장된 이름이 멤버 명단에서 빠졌으면(이름이 바뀌었거나 정리됨) 다시 고르게 한다
+  const removed = !!me && !picked && !!trip.members && !(memberKey(me) in trip.members)
+
+  if (!me || editingName || removed) {
     return (
       <NamePicker
         theme={theme}
         tripName={trip.meta.name}
         members={Object.values(trip.members ?? {}).map((m) => m.name)}
-        current={me}
-        onCancel={me ? () => setEditingName(false) : undefined}
+        current={removed ? '' : me}
+        onCancel={me && !removed ? () => setEditingName(false) : undefined}
         onPick={(name) => {
           saveName(tripId, name)
           setMe(name)
+          setPicked(true)
           setEditingName(false)
           void joinTrip(tripId, name)
         }}
@@ -236,7 +242,7 @@ function NamePicker({
       >
         {sorted.length > 0 && (
           <div className="pick-names">
-            <p className="caption">먼저 들어온 사람</p>
+            <p className="caption">멤버</p>
             <div className="chips">
               {sorted.map((m) => (
                 <button type="button" key={m} className={`chip ${m === current ? 'is-on' : ''}`} onClick={() => onPick(m)}>
@@ -247,7 +253,7 @@ function NamePicker({
           </div>
         )}
         <label className="big-field">
-          <span>{sorted.length ? '목록에 없으면 직접 입력' : '이름'}</span>
+          <span>{sorted.length ? '명단에 없으면 직접 입력' : '이름'}</span>
           <input placeholder="예: 김민수" value={name} onChange={(e) => setName(e.target.value)} maxLength={20} autoFocus={sorted.length === 0} />
         </label>
       </Screen>
